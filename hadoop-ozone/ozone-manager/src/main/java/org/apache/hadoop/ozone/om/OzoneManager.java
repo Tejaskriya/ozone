@@ -806,13 +806,17 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     }
     S3SecretCacheProvider secretCacheProvider = S3SecretCacheProvider.IN_MEMORY;
 
-    s3SecretManager = new S3SecretLockedManager(
+    S3Vault s3vault = new S3Vault();
+    /*s3SecretManager = new S3SecretLockedManager(
         new S3SecretManagerImpl(
             store,
             secretCacheProvider.get(configuration)
-        ),
+        ),*/
+    s3SecretManager = new S3SecretLockedManager(
+        new S3SecretManagerImpl(s3vault, s3vault),
         metadataManager.getLock()
     );
+
     if (secConfig.isSecurityEnabled() || testSecureOmFlag) {
       delegationTokenMgr = createDelegationTokenSecretManager(configuration);
     }

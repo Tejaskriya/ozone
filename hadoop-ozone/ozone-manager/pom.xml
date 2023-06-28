@@ -157,6 +157,12 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
       <artifactId>jersey-client</artifactId>
     </dependency>
 
+    <!-- https://mvnrepository.com/artifact/com.bettercloud/vault-java-driver -->
+    <dependency>
+      <groupId>com.bettercloud</groupId>
+      <artifactId>vault-java-driver</artifactId>
+      <version>5.1.0</version>
+    </dependency>
     <!-- Overrider ranger-intg jackson version -->
     <dependency>
       <groupId>org.codehaus.jackson</groupId>
