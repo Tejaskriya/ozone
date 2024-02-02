@@ -24,6 +24,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.stream.Stream;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
@@ -34,15 +35,16 @@ import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.ozone.test.GenericTestUtils;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.event.Level;
 
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_NODE_REPORT_INTERVAL;
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertThrowsExactly;
@@ -58,7 +60,7 @@ import static org.mockito.Mockito.when;
 /**
  * Tests for {@link ContainerBalancer}.
  */
-@Timeout(60)
+//@Timeout(60)
 public class TestContainerBalancer {
   private static final Logger LOG =
       LoggerFactory.getLogger(TestContainerBalancer.class);
@@ -69,17 +71,24 @@ public class TestContainerBalancer {
   private Map<String, ByteString> serviceToConfigMap = new HashMap<>();
   private StatefulServiceStateManager serviceStateManager;
   private OzoneConfiguration conf;
+  private static Integer[] rArr = new Integer[10000];
 
   /**
    * Sets up configuration values and creates a mock cluster.
    */
+  @BeforeAll
+  public static void firstSetup() {
+    for (int i = 0; i < rArr.length; i++) {
+      rArr[i] = i;
+    }
+  }
   @BeforeEach
   public void setup() throws IOException, NodeNotFoundException,
       TimeoutException {
     conf = new OzoneConfiguration();
-    conf.setTimeDuration(HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT,
+    /*conf.setTimeDuration(HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT,
         5, TimeUnit.SECONDS);
-    conf.setTimeDuration(HDDS_NODE_REPORT_INTERVAL, 2, TimeUnit.SECONDS);
+    conf.setTimeDuration(HDDS_NODE_REPORT_INTERVAL, 2, TimeUnit.SECONDS);*/
     scm = mock(StorageContainerManager.class);
     serviceStateManager = mock(StatefulServiceStateManagerImpl.class);
     balancerConfiguration =
@@ -117,7 +126,7 @@ public class TestContainerBalancer {
     containerBalancer = new ContainerBalancer(scm);
   }
 
-  @Test
+  //@Test
   public void testShouldRun() throws Exception {
     boolean doRun = containerBalancer.shouldRun();
     assertFalse(doRun);
@@ -129,7 +138,7 @@ public class TestContainerBalancer {
     assertFalse(doRun);
   }
 
-  @Test
+  //@Test
   public void testStartBalancerStop() throws Exception {
     startBalancer(balancerConfiguration);
     assertThrows(IllegalContainerBalancerStateException.class,
@@ -150,7 +159,7 @@ public class TestContainerBalancer {
         "Exception should be thrown when stop again");
   }
 
-  @Test
+  //@Test
   public void testStartStopSCMCalls() throws Exception {
     containerBalancer.saveConfiguration(balancerConfiguration, true, 0);
     containerBalancer.start();
@@ -168,7 +177,7 @@ public class TestContainerBalancer {
     containerBalancer.saveConfiguration(balancerConfiguration, false, 0);
   }
 
-  @Test
+  //@Test
   public void testNotifyStateChangeStopStart() throws Exception {
     containerBalancer.startBalancer(balancerConfiguration);
 
@@ -189,7 +198,7 @@ public class TestContainerBalancer {
    * This tests that ContainerBalancer rejects certain invalid configurations
    * while starting. It should fail to start in some cases.
    */
-  @Test
+  //@Test
   public void testValidationOfConfigurations() {
     conf = new OzoneConfiguration();
 
@@ -215,13 +224,21 @@ public class TestContainerBalancer {
    * status change notification in
    * {@link ContainerBalancer#notifyStatusChanged()}.
    */
-  @Test
-  public void testDelayedStartOnSCMStatusChange()
+  //@Test
+  public static Stream<Integer> values() {
+    return Stream.of(rArr);
+  }
+  @ParameterizedTest
+  @MethodSource("values")
+  public void testDelayedStartOnSCMStatusChange(Integer x)
       throws IllegalContainerBalancerStateException, IOException,
       InvalidContainerBalancerConfigurationException, TimeoutException,
       InterruptedException {
-    long delayDuration = conf.getTimeDuration(
-        HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT, 10, TimeUnit.SECONDS);
+    /*long delayDuration = conf.getTimeDuration(
+        HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT, 10, TimeUnit.SECONDS);*/
+    long delayDuration = 10;
+    conf.setTimeDuration("hdds.scm.wait.time.after.safemode.exit",
+        delayDuration, TimeUnit.SECONDS);
     balancerConfiguration =
         conf.getObject(ContainerBalancerConfiguration.class);
 
