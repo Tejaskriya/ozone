@@ -69,7 +69,7 @@ public class TestContainerBalancer {
   private Map<String, ByteString> serviceToConfigMap = new HashMap<>();
   private StatefulServiceStateManager serviceStateManager;
   private OzoneConfiguration conf;
-  private static Integer[] rArr = new Integer[10000];
+  private static Integer[] rArr = new Integer[3000];
 
   /**
    * Sets up configuration values and creates a mock cluster.
