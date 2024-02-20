@@ -284,7 +284,7 @@ public class ContainerBalancer extends StatefulService {
     currentBalancingThread.setName("ContainerBalancerTask-" + ID.incrementAndGet());
     currentBalancingThread.setDaemon(true);
     currentBalancingThread.start();
-    LOG.info("Starting Container Balancer {}... {}", currentBalancingThread, this);
+    LOG.info("Starting Container Balancer {}... {}.. {}", currentBalancingThread, this, task);
   }
 
   /**
@@ -333,7 +333,8 @@ public class ContainerBalancer extends StatefulService {
             "stopping");
         return;
       }
-      LOG.info("Trying to stop ContainerBalancer in this SCM.");
+      LOG.info("Trying to stop ContainerBalancer {} in this SCM. task: {}",
+          currentBalancingThread, task);
       task.stop();
       balancingThread = currentBalancingThread;
     } finally {
@@ -354,7 +355,7 @@ public class ContainerBalancer extends StatefulService {
     } catch (InterruptedException exception) {
       Thread.currentThread().interrupt();
     }
-    LOG.info("Container Balancer stopped successfully.");
+    LOG.info("Container Balancer {} stopped successfully.", balancingThread);
   }
 
   /**

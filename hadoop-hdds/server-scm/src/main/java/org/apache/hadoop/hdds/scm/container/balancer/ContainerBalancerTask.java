@@ -1116,13 +1116,13 @@ public class ContainerBalancerTask implements Runnable {
     return taskStatus;
   }
 
-  @Override
+  /*@Override
   public String toString() {
     String status = String.format("%nContainer Balancer Task status:%n" +
         "%-30s %s%n" +
         "%-30s %b%n", "Key", "Value", "Running", isBalancerRunning());
     return status + config.toString();
-  }
+  }*/
 
   /**
    * The result of {@link ContainerBalancerTask#doIteration()}.

@@ -22,6 +22,9 @@ cd "$DIR/../../.." || exit 1
 : ${CHECK:="unit"}
 : ${ITERATIONS:="1"}
 : ${OZONE_WITH_COVERAGE:="false"}
+#: ${FAIL_FAST:="false"}
+#: ${MAVEN_OPTS:="-Dhttp.keepAlive=false -Dmaven.wagon.http.pool=false -Dmaven.wagon.http.retryHandler.class=standard -Dmaven.wagon.http.retryHandler.count=3"}
+#: ${OZONE_WITH_COVERAGE:="false"}
 
 declare -i ITERATIONS
 if [[ ${ITERATIONS} -le 0 ]]; then

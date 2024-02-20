@@ -51,7 +51,7 @@ import static org.mockito.Mockito.when;
 /**
  * Tests for {@link ContainerBalancer}.
  */
-//@Timeout(60)
+//@Timeout(30)
 public class TestContainerBalancer {
   private static final Logger LOG =
       LoggerFactory.getLogger(TestContainerBalancer.class);
@@ -112,6 +112,7 @@ public class TestContainerBalancer {
 
   @Test
   public void testShouldRun() throws Exception {
+    LOG.info("Running - testShouldRun");
     boolean doRun = containerBalancer.shouldRun();
     Assertions.assertFalse(doRun);
     containerBalancer.saveConfiguration(balancerConfiguration, true, 0);
@@ -124,6 +125,7 @@ public class TestContainerBalancer {
 
   @Test
   public void testStartBalancerStop() throws Exception {
+    LOG.info("Running - testStartBalancerStop");
     startBalancer(balancerConfiguration);
     try {
       containerBalancer.startBalancer(balancerConfiguration);
@@ -159,6 +161,7 @@ public class TestContainerBalancer {
 
   @Test
   public void testStartStopSCMCalls() throws Exception {
+    LOG.info("Running - testStartStopSCMCalls");
     containerBalancer.saveConfiguration(balancerConfiguration, true, 0);
     containerBalancer.start();
     Assertions.assertTrue(containerBalancer.getBalancerStatus()
@@ -183,6 +186,7 @@ public class TestContainerBalancer {
 
   @Test
   public void testNotifyStateChangeStopStart() throws Exception {
+    LOG.info("Running - testNotifyStateChangeStopStart");
     containerBalancer.startBalancer(balancerConfiguration);
 
     scm.getScmContext().updateLeaderAndTerm(false, 1);
@@ -208,6 +212,7 @@ public class TestContainerBalancer {
    */
   @Test
   public void testValidationOfConfigurations() {
+    LOG.info("Running - testValidationOfConfigurations");
     conf = new OzoneConfiguration();
 
     conf.setTimeDuration(
@@ -224,6 +229,7 @@ public class TestContainerBalancer {
         () -> containerBalancer.startBalancer(balancerConfiguration),
         "hdds.container.balancer.move.replication.timeout should " +
             "be less than hdds.container.balancer.move.timeout.");
+    Assertions.fail("Failing validateConfigs to get logs");
   }
 
   /**
@@ -237,6 +243,7 @@ public class TestContainerBalancer {
       throws IllegalContainerBalancerStateException, IOException,
       InvalidContainerBalancerConfigurationException, TimeoutException,
       InterruptedException {
+    LOG.info("Running - testDelayedStartOnSCMStatusChange");
     long delayDuration = 10;
     conf.setTimeDuration("hdds.scm.wait.time.after.safemode.exit",
         delayDuration, TimeUnit.SECONDS);
