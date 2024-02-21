@@ -168,20 +168,20 @@ public class ContainerBalancerTask implements Runnable {
    */
   public void run() {
     try {
-      LOG.info("In ContainerBalancerTask#run, bal:{}, delay:{}",
+      LOG.info("In ContainerBalancerTask#run, task: {}, containerBalancer:{}, bal:{}, delay:{}", this, containerBalancer,
           isBalancerRunning(), delayStart);
       if (isBalancerRunning() && delayStart) {
         long delayDuration = ozoneConfiguration.getTimeDuration(
             HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT,
             HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT_DEFAULT,
             TimeUnit.SECONDS);
-        LOG.info("ContainerBalancer will sleep for {} seconds before starting" +
-            " balancing.", delayDuration);
+        LOG.info("ContainerBalancer{}, task:{} will sleep for {} seconds before starting" +
+            " balancing.", containerBalancer, this, delayDuration);
         Thread.sleep(Duration.ofSeconds(delayDuration).toMillis());
       }
       balance();
     } catch (Exception e) {
-      LOG.error("Container Balancer is stopped abnormally, ", e);
+      LOG.error("Container Balancer " + containerBalancer + "task:" + this + " is stopped abnormally, ", e);
     } finally {
       synchronized (this) {
         taskStatus = Status.STOPPED;
@@ -229,12 +229,12 @@ public class ContainerBalancerTask implements Runnable {
           // reporting back make it like this for now, a more suitable
           // value. can be set in the future if needed
           long sleepTime = 3 * nodeReportInterval;
-          LOG.info("ContainerBalancer will sleep for {} ms while waiting " +
-              "for updated usage information from Datanodes.", sleepTime);
+          LOG.info("ContainerBalancer:{}, task:{} will sleep for {} ms while waiting " +
+              "for updated usage information from Datanodes.", containerBalancer, this, sleepTime);
           Thread.sleep(nodeReportInterval);
         } catch (InterruptedException e) {
-          LOG.info("Container Balancer was interrupted while waiting for" +
-              "datanodes refreshing volume usage info");
+          LOG.info("Container Balancer:{}, task:{} was interrupted while waiting for" +
+              "datanodes refreshing volume usage info", containerBalancer, this);
           Thread.currentThread().interrupt();
           return;
         }

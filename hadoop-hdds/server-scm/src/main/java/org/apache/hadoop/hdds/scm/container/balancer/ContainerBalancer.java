@@ -92,7 +92,8 @@ public class ContainerBalancer extends StatefulService {
         lock.unlock();
       }
       if (shouldStop) {
-        LOG.info("Stopping ContainerBalancer in this scm on status change");
+        LOG.info("Stopping ContainerBalancer {} in this scm on status change, " +
+            "ContainerBalancerTask {}, currentbalancingThread {}", this, task, currentBalancingThread);
         stop();
       }
       return;
@@ -275,6 +276,7 @@ public class ContainerBalancer extends StatefulService {
       boolean delayStart) {
     task = new ContainerBalancerTask(scm, nextIterationIndex, this, metrics,
         config, delayStart);
+    LOG.info("before starting thread, containerBalancer:{}, task:{}, currentBalThread:{}", this, task, currentBalancingThread);
     /*Thread thread = new Thread(task);
     thread.setName("ContainerBalancerTask-" + ID.incrementAndGet());
     thread.setDaemon(true);
@@ -284,7 +286,7 @@ public class ContainerBalancer extends StatefulService {
     currentBalancingThread.setName("ContainerBalancerTask-" + ID.incrementAndGet());
     currentBalancingThread.setDaemon(true);
     currentBalancingThread.start();
-    LOG.info("Starting Container Balancer {}... {}.. {}", currentBalancingThread, this, task);
+    LOG.info("Starting Container Balancer {}... task: {}.. currentBalThread {}", this, task, currentBalancingThread);
   }
 
   /**
@@ -329,12 +331,12 @@ public class ContainerBalancer extends StatefulService {
     Thread balancingThread;
     try {
       if (!canBalancerStop()) {
-        LOG.warn("Cannot stop Container Balancer because it's not running or " +
-            "stopping");
+        LOG.warn("Cannot stop Container Balancer {} because it's not running or " +
+            "stopping, task: {}, currentBalThread: {}", this, task, currentBalancingThread);
         return;
       }
-      LOG.info("Trying to stop ContainerBalancer {} in this SCM. task: {}",
-          currentBalancingThread, task);
+      LOG.info("Trying to stop ContainerBalancer {} in this SCM. task: {}, currentBalancingThread: {}",
+          currentBalancingThread, task, currentBalancingThread);
       task.stop();
       balancingThread = currentBalancingThread;
     } finally {
@@ -348,11 +350,13 @@ public class ContainerBalancer extends StatefulService {
     // NOTE: join should be called outside the lock in hierarchy
     // to avoid locking others waiting
     // wait for balancingThread to die with interrupt
+    LOG.info("In blockTillTaskStop before interrupt, currentThread: {}, balancingThread: {}", Thread.currentThread(), balancingThread);
     balancingThread.interrupt();
     LOG.info("Container Balancer waiting for {} to stop", balancingThread);
     try {
       balancingThread.join();
     } catch (InterruptedException exception) {
+      LOG.info("In Catch of blockTaskTillStop, interrupting currentThread: {}", Thread.currentThread());
       Thread.currentThread().interrupt();
     }
     LOG.info("Container Balancer {} stopped successfully.", balancingThread);
@@ -371,7 +375,7 @@ public class ContainerBalancer extends StatefulService {
     try {
       validateState(true);
       saveConfiguration(config, false, 0);
-      LOG.info("Trying to stop ContainerBalancer service.");
+      LOG.info("Trying to stop ContainerBalancer {} service. task:{}, currentBalThread: {}", this, task, currentBalancingThread);
       task.stop();
       balancingThread = currentBalancingThread;
     } finally {
@@ -446,11 +450,11 @@ public class ContainerBalancer extends StatefulService {
     return currentBalancingThread;
   }
 
-  @Override
+  /*@Override
   public String toString() {
     String status = String.format("%nContainer Balancer status:%n" +
         "%-30s %s%n" +
         "%-30s %b%n", "Key", "Value", "Running", isBalancerRunning());
     return status + config.toString();
-  }
+  }*/
 }
