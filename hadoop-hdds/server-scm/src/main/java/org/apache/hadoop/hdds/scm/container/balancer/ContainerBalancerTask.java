@@ -103,7 +103,6 @@ public class ContainerBalancerTask implements Runnable {
   private double lowerLimit;
   private ContainerBalancerSelectionCriteria selectionCriteria;
   private volatile Status taskStatus = Status.RUNNING;
-  private AtomicBoolean isStopped = new AtomicBoolean(false);
 
   /*
   Since a container can be selected only once during an iteration, these maps
@@ -194,7 +193,6 @@ public class ContainerBalancerTask implements Runnable {
    * Changes the status from RUNNING to STOPPING.
    */
   public void stop() {
-    isStopped.set(true);
     synchronized (this) {
       if (taskStatus == Status.RUNNING) {
         taskStatus = Status.STOPPING;
@@ -1049,9 +1047,6 @@ public class ContainerBalancerTask implements Runnable {
    * @return true if the status is RUNNING, otherwise false
    */
   private boolean isBalancerRunning() {
-    if (isStopped.equals(true)) {
-      return false;
-    }
     return taskStatus == Status.RUNNING;
   }
 
