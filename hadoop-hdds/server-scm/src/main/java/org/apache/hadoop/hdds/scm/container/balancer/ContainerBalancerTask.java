@@ -176,7 +176,7 @@ public class ContainerBalancerTask implements Runnable {
             HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT_DEFAULT,
             TimeUnit.SECONDS);
         LOG.info("ContainerBalancer{}, task:{} will sleep for {} seconds before starting" +
-            " balancing.", containerBalancer, this, delayDuration);
+            " balancing. isInterrupted: {}", containerBalancer, this, delayDuration, Thread.currentThread().isInterrupted());
         Thread.sleep(Duration.ofSeconds(delayDuration).toMillis());
       }
       balance();
@@ -230,7 +230,8 @@ public class ContainerBalancerTask implements Runnable {
           // value. can be set in the future if needed
           long sleepTime = 3 * nodeReportInterval;
           LOG.info("ContainerBalancer:{}, task:{} will sleep for {} ms while waiting " +
-              "for updated usage information from Datanodes.", containerBalancer, this, sleepTime);
+              "for updated usage information from Datanodes; isInterrupted:{}", containerBalancer, this,
+              sleepTime, Thread.currentThread().isInterrupted());
           Thread.sleep(nodeReportInterval);
         } catch (InterruptedException e) {
           LOG.info("Container Balancer:{}, task:{} was interrupted while waiting for" +

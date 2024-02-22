@@ -93,7 +93,8 @@ public class ContainerBalancer extends StatefulService {
       }
       if (shouldStop) {
         LOG.info("Stopping ContainerBalancer {} in this scm on status change, " +
-            "ContainerBalancerTask {}, currentbalancingThread {}", this, task, currentBalancingThread);
+            "ContainerBalancerTask {}, currentbalancingThread {}, isInterrupted {}", this, task, currentBalancingThread,
+            currentBalancingThread.isInterrupted());
         stop();
       }
       return;
@@ -276,7 +277,8 @@ public class ContainerBalancer extends StatefulService {
       boolean delayStart) {
     task = new ContainerBalancerTask(scm, nextIterationIndex, this, metrics,
         config, delayStart);
-    LOG.info("before starting thread, containerBalancer:{}, task:{}, currentBalThread:{}", this, task, currentBalancingThread);
+    LOG.info("before starting thread, containerBalancer:{}, task:{}, currentBalThread:{}, isInterrupted:{}", this, task,
+        currentBalancingThread, currentBalancingThread.isInterrupted());
     /*Thread thread = new Thread(task);
     thread.setName("ContainerBalancerTask-" + ID.incrementAndGet());
     thread.setDaemon(true);
@@ -286,7 +288,8 @@ public class ContainerBalancer extends StatefulService {
     currentBalancingThread.setName("ContainerBalancerTask-" + ID.incrementAndGet());
     currentBalancingThread.setDaemon(true);
     currentBalancingThread.start();
-    LOG.info("Starting Container Balancer {}... task: {}.. currentBalThread {}", this, task, currentBalancingThread);
+    LOG.info("Starting Container Balancer {}... task: {}.. currentBalThread {}, isInterrupted:{}", this, task,
+        currentBalancingThread, currentBalancingThread.isInterrupted());
   }
 
   /**
@@ -332,11 +335,11 @@ public class ContainerBalancer extends StatefulService {
     try {
       if (!canBalancerStop()) {
         LOG.warn("Cannot stop Container Balancer {} because it's not running or " +
-            "stopping, task: {}, currentBalThread: {}", this, task, currentBalancingThread);
+            "stopping, task: {}, currentBalThread: {}, isInterrupted: {}", this, task, currentBalancingThread, currentBalancingThread.isInterrupted());
         return;
       }
-      LOG.info("Trying to stop ContainerBalancer {} in this SCM. task: {}, currentBalancingThread: {}",
-          currentBalancingThread, task, currentBalancingThread);
+      LOG.info("Trying to stop ContainerBalancer {} in this SCM. task: {}, currentBalancingThread: {}, isInterrupted:{}",
+          currentBalancingThread, task, currentBalancingThread, currentBalancingThread.isInterrupted());
       task.stop();
       balancingThread = currentBalancingThread;
     } finally {
@@ -350,9 +353,11 @@ public class ContainerBalancer extends StatefulService {
     // NOTE: join should be called outside the lock in hierarchy
     // to avoid locking others waiting
     // wait for balancingThread to die with interrupt
-    LOG.info("In blockTillTaskStop before interrupt, currentThread: {}, balancingThread: {}", Thread.currentThread(), balancingThread);
+    LOG.info("In blockTillTaskStop before interrupt, currentThread: {} isInterrupted:{}, balancingThread: {}, isInterrupted:{}",
+        Thread.currentThread(), Thread.currentThread().isInterrupted(), balancingThread, balancingThread.isInterrupted());
     balancingThread.interrupt();
-    LOG.info("Container Balancer waiting for {} to stop", balancingThread);
+    LOG.info("Container Balancer {} isInterrupted {},  waiting for balancing thread {} to stop, isInterrupted: {}",
+        Thread.currentThread(), Thread.currentThread().isInterrupted()balancingThread, balancingThread.isInterrupted());
     try {
       balancingThread.join();
     } catch (InterruptedException exception) {
@@ -375,7 +380,8 @@ public class ContainerBalancer extends StatefulService {
     try {
       validateState(true);
       saveConfiguration(config, false, 0);
-      LOG.info("Trying to stop ContainerBalancer {} service. task:{}, currentBalThread: {}", this, task, currentBalancingThread);
+      LOG.info("Trying to stop ContainerBalancer {} service. task:{}, currentBalThread: {}, isInterrupted: {}",
+          this, task, currentBalancingThread, currentBalancingThread.isInterrupted());
       task.stop();
       balancingThread = currentBalancingThread;
     } finally {
