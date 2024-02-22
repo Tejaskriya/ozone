@@ -357,7 +357,7 @@ public class ContainerBalancer extends StatefulService {
         Thread.currentThread(), Thread.currentThread().isInterrupted(), balancingThread, balancingThread.isInterrupted());
     balancingThread.interrupt();
     LOG.info("Container Balancer {} isInterrupted {},  waiting for balancing thread {} to stop, isInterrupted: {}",
-        Thread.currentThread(), Thread.currentThread().isInterrupted()balancingThread, balancingThread.isInterrupted());
+        Thread.currentThread(), Thread.currentThread().isInterrupted(), balancingThread, balancingThread.isInterrupted());
     try {
       balancingThread.join();
     } catch (InterruptedException exception) {
