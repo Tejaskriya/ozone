@@ -264,7 +264,7 @@ public class TestContainerBalancer {
 
     GenericTestUtils.LogCapturer logCapturer =
         GenericTestUtils.LogCapturer.captureLogs(ContainerBalancerTask.LOG);
-    String expectedLog = "ContainerBalancer will sleep for " + delayDuration +
+    String expectedLog = "will sleep for " + delayDuration +
         " seconds before starting balancing.";
     /*
      Send a status change notification again and check whether balancer
