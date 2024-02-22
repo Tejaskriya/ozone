@@ -277,8 +277,7 @@ public class ContainerBalancer extends StatefulService {
       boolean delayStart) {
     task = new ContainerBalancerTask(scm, nextIterationIndex, this, metrics,
         config, delayStart);
-    LOG.info("before starting thread, containerBalancer:{}, task:{}, currentBalThread:{}, isInterrupted:{}", this, task,
-        currentBalancingThread, currentBalancingThread.isInterrupted());
+    LOG.info("before starting thread, containerBalancer:{}, task:{}", this, task);
     /*Thread thread = new Thread(task);
     thread.setName("ContainerBalancerTask-" + ID.incrementAndGet());
     thread.setDaemon(true);
