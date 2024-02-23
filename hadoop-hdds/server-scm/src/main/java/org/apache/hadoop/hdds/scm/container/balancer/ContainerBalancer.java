@@ -352,13 +352,15 @@ public class ContainerBalancer extends StatefulService {
     // NOTE: join should be called outside the lock in hierarchy
     // to avoid locking others waiting
     // wait for balancingThread to die with interrupt
-    LOG.info("In blockTillTaskStop before interrupt, currentThread: {} isInterrupted:{}, balancingThread: {}, isInterrupted:{}",
-        Thread.currentThread(), Thread.currentThread().isInterrupted(), balancingThread, balancingThread.isInterrupted());
-    balancingThread.interrupt();
-    LOG.info("Container Balancer {} isInterrupted {},  waiting for balancing thread {} to stop, isInterrupted: {}",
-        Thread.currentThread(), Thread.currentThread().isInterrupted(), balancingThread, balancingThread.isInterrupted());
     try {
-      balancingThread.join();
+      LOG.info("In blockTillTaskStop before interrupt, currentThread: {} isInterrupted:{}, balancingThread: {}, isInterrupted:{}",
+          Thread.currentThread(), Thread.currentThread().isInterrupted(), balancingThread, balancingThread.isInterrupted());
+      /*LOG.info("Container Balancer {} isInterrupted {}, waiting for balancing thread {} to stop, isInterrupted: {}",
+          Thread.currentThread(), Thread.currentThread().isInterrupted(), balancingThread, balancingThread.isInterrupted());*/
+      while (balancingThread.isAlive()) {
+        balancingThread.interrupt();
+        balancingThread.join(5);
+      }
     } catch (InterruptedException exception) {
       LOG.info("In Catch of blockTaskTillStop, interrupting currentThread: {}", Thread.currentThread());
       Thread.currentThread().interrupt();
