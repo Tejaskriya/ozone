@@ -170,7 +170,7 @@ public class ContainerBalancerTask implements Runnable {
     try {
       LOG.info("In ContainerBalancerTask#run, task: {}, containerBalancer:{}, bal:{}, delay:{}", this, containerBalancer,
           isBalancerRunning(), delayStart);
-      if (isBalancerRunning() && delayStart) {
+      if (delayStart) {
         long delayDuration = ozoneConfiguration.getTimeDuration(
             HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT,
             HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT_DEFAULT,
