@@ -1432,7 +1432,7 @@ public class RpcClient implements ClientProtocol {
     if (checkKeyNameEnabled) {
       HddsClientUtils.verifyKeyName(keyName);
     }
-    HddsClientUtils.checkNotNull(keyName, replicationConfig);
+    HddsClientUtils.checkNotNull(keyName);
 
     OmKeyArgs.Builder builder = new OmKeyArgs.Builder()
         .setVolumeName(volumeName)
