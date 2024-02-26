@@ -98,6 +98,10 @@ for i in $(seq 1 ${ITERATIONS}); do
   fi
 done
 
+if [[ ${ITERATIONS} -gt 1 ]]; then
+  grep -c "exit code: [^0]" "${REPORT_DIR}/summary.txt" > "${REPORT_DIR}/failures"
+fi
+
 # check if Maven failed due to some error other than test failure
 if [[ ${rc} -ne 0 ]] && [[ ! -s "${REPORT_FILE}" ]]; then
   grep -m1 -F '[ERROR]' "${REPORT_DIR}/output.log" > "${REPORT_FILE}"

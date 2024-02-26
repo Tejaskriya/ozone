@@ -16,7 +16,7 @@ name: full-ci
 on:
   workflow_call:
 env:
-  FAIL_FAST: ${{ github.event_name == 'pull_request' }}
+  FAIL_FAST: false
   MAVEN_OPTS: -Dhttp.keepAlive=false -Dmaven.wagon.http.pool=false -Dmaven.wagon.http.retryHandler.class=standard -Dmaven.wagon.http.retryHandler.count=3
   OZONE_WITH_COVERAGE: ${{ github.repository == 'apache/ozone' && github.event_name != 'pull_request' }}
 jobs:
@@ -26,16 +26,16 @@ jobs:
       GITHUB_CONTEXT: ${{ toJson(github) }}
     outputs:
       acceptance-suites: ${{ steps.acceptance-suites.outputs.suites }}
-      needs-basic-check: ${{ steps.categorize-basic-checks.outputs.needs-basic-check }}
+      needs-basic-check: false
       needs-unit-check: ${{ steps.categorize-basic-checks.outputs.needs-unit-check }}
       basic-checks: ${{ steps.categorize-basic-checks.outputs.basic-checks }}
       unit-checks: ${{ steps.categorize-basic-checks.outputs.unit-checks }}
-      needs-build: ${{ steps.selective-checks.outputs.needs-build }}
-      needs-compile: ${{ steps.selective-checks.outputs.needs-compile }}
-      needs-compose-tests: ${{ steps.selective-checks.outputs.needs-compose-tests }}
-      needs-dependency-check: ${{ steps.selective-checks.outputs.needs-dependency-check }}
-      needs-integration-tests: ${{ steps.selective-checks.outputs.needs-integration-tests }}
-      needs-kubernetes-tests: ${{ steps.selective-checks.outputs.needs-kubernetes-tests }}
+      needs-build: false
+      needs-compile: false
+      needs-compose-tests: false
+      needs-dependency-check: false
+      needs-integration-tests: false
+      needs-kubernetes-tests: false
     steps:
       - name: "Checkout ${{ github.ref }} ( ${{ github.sha }} )"
         uses: actions/checkout@v4
@@ -231,13 +231,12 @@ jobs:
   unit:
     needs:
       - build-info
-      - basic
     runs-on: ubuntu-20.04
     timeout-minutes: 150
     if: needs.build-info.outputs.needs-unit-check == 'true'
     strategy:
       matrix:
-        check: ${{ fromJson(needs.build-info.outputs.unit-checks) }}
+        profile: [ 1, 2, 3, 4, 5 ]
       fail-fast: false
     steps:
       - name: Checkout project
@@ -257,16 +256,20 @@ jobs:
           distribution: 'temurin'
           java-version: 8
       - name: Execute tests
-        run: hadoop-ozone/dev-support/checks/${{ matrix.check }}.sh
+        run: bash hadoop-ozone/dev-support/checks/junit.sh -pl :hdds-server-scm -Dtest=TestContainerBalancer
         continue-on-error: true
         env:
+          ITERATIONS: 30
           GRADLE_ENTERPRISE_ACCESS_KEY: ${{ secrets.GE_ACCESS_TOKEN }}
       - name: Summary of failures
         run: hadoop-ozone/dev-support/checks/_summary.sh target/${{ matrix.check }}/summary.txt
-        if: ${{ !cancelled() }}
+        if: always()
+      - name: Number of failures
+        run: cat target/${{ github.job }}/failures
+        if: always()
       - name: Archive build results
         uses: actions/upload-artifact@v4
-        if: ${{ !cancelled() }}
+        if: always()
         with:
           name: ${{ matrix.check }}
           path: target/${{ matrix.check }}
