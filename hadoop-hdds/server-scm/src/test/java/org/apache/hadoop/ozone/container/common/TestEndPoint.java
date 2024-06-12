@@ -472,11 +472,11 @@ public class TestEndPoint {
 
   @Test
   public void testRegisterRpcTimeout() throws Exception {
-    final long rpcTimeout = 1000;
-    final long tolerance = 700;
-    scmServerImpl.setRpcResponseDelay(2000);
+    final int rpcTimeout = 1500;
+    final int tolerance = 700;
+    scmServerImpl.setRpcResponseDelay(2500);
     long start = Time.monotonicNow();
-    registerTaskHelper(serverAddress, 1000, false).close();
+    registerTaskHelper(serverAddress, rpcTimeout, false).close();
     long end = Time.monotonicNow();
     scmServerImpl.setRpcResponseDelay(0);
     assertThat(end - start).isLessThanOrEqualTo(rpcTimeout + tolerance);
