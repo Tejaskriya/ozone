@@ -472,8 +472,8 @@ public class TestEndPoint {
 
   @Test
   public void testRegisterRpcTimeout() throws Exception {
-    final int rpcTimeout = 1500;
-    final int tolerance = 700;
+    final int rpcTimeout = 1000;
+    final int tolerance = 800;
     scmServerImpl.setRpcResponseDelay(2500);
     long start = Time.monotonicNow();
     registerTaskHelper(serverAddress, rpcTimeout, false).close();
