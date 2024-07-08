@@ -374,9 +374,17 @@ public class XceiverClientGrpc extends XceiverClientSpi {
     }
 
     if (blockID != null) {
+      if (request.getCmdType() != ContainerProtos.Type.ReadChunk) {
+        datanodeList = pipeline.getNodes();
+        int getBlockDNLeaderIndex = datanodeList.indexOf(pipeline.getLeaderNode());
+        if (getBlockDNLeaderIndex > 0) {
+          // Pull the leader DN to the top of the DN list
+          Collections.swap(datanodeList, 0, getBlockDNLeaderIndex);
+        }
+      }
       // Check if the DN to which the GetBlock command was sent has been cached.
       DatanodeDetails cachedDN = getBlockDNcache.get(blockID);
-      if (cachedDN != null) {
+      if (cachedDN != null && !topologyAwareRead) {
         datanodeList = pipeline.getNodes();
         int getBlockDNCacheIndex = datanodeList.indexOf(cachedDN);
         if (getBlockDNCacheIndex > 0) {
@@ -555,31 +563,13 @@ public class XceiverClientGrpc extends XceiverClientSpi {
               @Override
               public void onNext(ContainerCommandResponseProto value) {
                 replyFuture.complete(value);
-                metrics.decrPendingContainerOpsMetrics(request.getCmdType());
-                long cost = System.currentTimeMillis() - requestTime;
-                metrics.addContainerOpsLatency(request.getCmdType(),
-                    cost);
-                if (LOG.isDebugEnabled()) {
-                  LOG.debug("Executed command {} on datanode {}, cost = {}, "
-                          + "cmdType = {}", processForDebug(request), dn,
-                      cost, request.getCmdType());
-                }
-                semaphore.release();
+                decreasePendingMetricsAndReleaseSemaphore();
               }
 
               @Override
               public void onError(Throwable t) {
                 replyFuture.completeExceptionally(t);
-                metrics.decrPendingContainerOpsMetrics(request.getCmdType());
-                long cost = System.currentTimeMillis() - requestTime;
-                metrics.addContainerOpsLatency(request.getCmdType(),
-                    System.currentTimeMillis() - requestTime);
-                if (LOG.isDebugEnabled()) {
-                  LOG.debug("Executed command {} on datanode {}, cost = {}, "
-                          + "cmdType = {}", processForDebug(request), dn,
-                      cost, request.getCmdType());
-                }
-                semaphore.release();
+                decreasePendingMetricsAndReleaseSemaphore();
               }
 
               @Override
@@ -589,6 +579,17 @@ public class XceiverClientGrpc extends XceiverClientSpi {
                       "Stream completed but no reply for request " +
                           processForDebug(request)));
                 }
+              }
+
+              private void decreasePendingMetricsAndReleaseSemaphore() {
+                metrics.decrPendingContainerOpsMetrics(request.getCmdType());
+                long cost = System.currentTimeMillis() - requestTime;
+                metrics.addContainerOpsLatency(request.getCmdType(), cost);
+                if (LOG.isDebugEnabled()) {
+                  LOG.debug("Executed command {} on datanode {}, cost = {}, cmdType = {}",
+                      processForDebug(request), dn, cost, request.getCmdType());
+                }
+                semaphore.release();
               }
             });
     requestObserver.onNext(request);
