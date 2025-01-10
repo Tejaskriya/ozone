@@ -144,3 +144,13 @@ Test ozone debug ldb scan with filter option failure
     # test filter option for lesser/greater operator on non-numeric field
     ${output} =         Execute And Ignore Error        ozone debug ldb --db=/data/metadata/om.db scan --cf=keyTable --filter="keyName:lesser:k1"
                         Should contain                  ${output}           only on numeric values
+
+Test ozone debug ldb scan with schema option
+                        Execute                         cp /data/metadata/om.db /data/metadata/my.db
+    ${output} =         Execute And Ignore Error        ozone debug ldb --db=/data/metadata/my.db scan --cf=keyTable
+                        Should contain                  ${output}           Incorrect DB Path
+    ${output} =         Execute And Ignore Error        ozone debug ldb --db=/data/metadata/my.db --schema="org.apache.hadoop.ozone.om.codec.OMDBDefinition" scan --cf=keyTable
+                        Should not contain              ${output}           Incorrect DB Path
+                        Should contain                  ${output}           testfile1
+                        Should contain                  ${output}           testfile2
+                        Should contain                  ${output}           testfile3
