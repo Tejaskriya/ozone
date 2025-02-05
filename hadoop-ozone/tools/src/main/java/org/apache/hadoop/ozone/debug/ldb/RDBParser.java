@@ -43,19 +43,11 @@ public class RDBParser implements DebugSubcommand {
       description = "Database File Path")
   private String dbPath;
 
-  @CommandLine.Option(names = {"--schema"},
-      description = "DBDefinition of the database")
-  private String dbDefinition;
-
   public String getDbPath() {
     return dbPath;
   }
 
   public void setDbPath(String dbPath) {
     this.dbPath = dbPath;
-  }
-  
-  public String getDbDefinition() {
-    return dbDefinition;
   }
 }

@@ -31,11 +31,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.utils.IOUtils;
-import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
-import org.apache.hadoop.hdds.utils.db.DBDefinition;
-import org.apache.hadoop.hdds.utils.db.FixedLengthStringCodec;
-import org.apache.hadoop.hdds.utils.db.LongCodec;
-import org.apache.hadoop.hdds.utils.db.RocksDatabase;
+import org.apache.hadoop.hdds.utils.db.*;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedReadOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator;
@@ -45,6 +41,7 @@ import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfigurati
 import org.apache.hadoop.ozone.container.metadata.DatanodeSchemaThreeDBDefinition;
 import org.apache.hadoop.ozone.debug.DBDefinitionFactory;
 import org.apache.hadoop.ozone.debug.RocksDBUtils;
+import org.apache.hadoop.ozone.utils.CodecFactory;
 import org.apache.hadoop.ozone.utils.Filter;
 import org.rocksdb.ColumnFamilyDescriptor;
 import org.rocksdb.ColumnFamilyHandle;
@@ -176,6 +173,14 @@ public class DBScanner implements Callable<Void> {
       description = "The number of records to print per file.",
       defaultValue = "0")
   private long recordsPerFile;
+
+  @CommandLine.Option(names = {"--key-codec"},
+      description = "key codec of the table")
+  private String keyCodec;
+
+  @CommandLine.Option(names = {"--value-codec"},
+      description = "value codec of the table")
+  private String valueCodec;
 
   private int fileSuffix = 0;
   private long globalCount = 0;
@@ -562,6 +567,31 @@ public class DBScanner implements Callable<Void> {
         .orElse(null);
   }
 
+  private DBColumnFamilyDefinition getColumnFamilyDefinition(String dbPath) {
+
+    if ((keyCodec != null && valueCodec == null) || (keyCodec == null && valueCodec != null)) {
+      throw new IllegalStateException("Both key-codec and value-codec are needed");
+    }
+    if (keyCodec != null && valueCodec != null) {
+      try {
+        CodecFactory.MyCodec<?> codecForKey = CodecFactory.createCodec(keyCodec);
+        CodecFactory.MyCodec<?> codecForValue = CodecFactory.createCodec(valueCodec);
+        return new DBColumnFamilyDefinition(tableName, codecForKey, codecForValue);
+      } catch (ClassNotFoundException ex) {
+        throw new IllegalStateException("Incorrect keyCodec (" + keyCodec +
+            ") or valueCodec (" + valueCodec + ") passed.");
+      }
+    }
+
+    DBDefinitionFactory.setDnDBSchemaVersion(dnDBSchemaVersion);
+    DBDefinition dbDefinition = DBDefinitionFactory.getDefinition(
+        Paths.get(dbPath), new OzoneConfiguration());
+    if (dbDefinition == null) {
+      err().println("Error: Incorrect DB Path");
+    }
+    return dbDefinition.getColumnFamily(tableName);
+  }
+
   /**
    * Main table printing logic.
    * User-provided args are not in the arg list. Those are instance variables
@@ -579,16 +609,8 @@ public class DBScanner implements Callable<Void> {
               " number is -1 which is to dump entire table");
     }
     dbPath = removeTrailingSlashIfNeeded(dbPath);
-    DBDefinitionFactory.setDnDBSchemaVersion(dnDBSchemaVersion);
-    DBDefinition dbDefinition = DBDefinitionFactory.getDefinition(
-        Paths.get(dbPath), new OzoneConfiguration(), parent.getDbDefinition());
-    if (dbDefinition == null) {
-      err().println("Error: Incorrect DB Path");
-      return false;
-    }
 
-    final DBColumnFamilyDefinition<?, ?> columnFamilyDefinition =
-        dbDefinition.getColumnFamily(tableName);
+    final DBColumnFamilyDefinition<?, ?> columnFamilyDefinition = getColumnFamilyDefinition(dbPath);
     if (columnFamilyDefinition == null) {
       err().print("Error: Table with name '" + tableName + "' not found");
       return false;
