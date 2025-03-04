@@ -56,6 +56,7 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.apache.hadoop.ozone.OzoneConsts.COMPACTION_LOG_TABLE;
 
 /**
  * Handler to generate image for current compaction DAG in the OM leader node.
@@ -76,8 +77,14 @@ public class CompactionLogDagPrinter extends Handler
   @CommandLine.Option(names = {"--db"},
       required = true,
       scope = CommandLine.ScopeType.INHERIT,
-      description = "Database File Path")
+      description = "om.db File Path")
   private String dbPath;
+
+  @CommandLine.Option(names = {"--compaction-log"},
+      required = true,
+      scope = CommandLine.ScopeType.INHERIT,
+      description = "compaction-log directory Path")
+  private String compactionLogDir;
 
   // TODO: Change graphType to enum.
   @CommandLine.Option(names = {"-t", "--graph-type"},
@@ -94,6 +101,13 @@ public class CompactionLogDagPrinter extends Handler
   @Override
   protected void execute(OzoneClient client, OzoneAddress address)
       throws IOException {
+
+    System.out.println("trying with om client call:");
+    String message = client.getObjectStore()
+        .printCompactionLogDag(fileNamePrefix, graphType);
+    System.out.println(message);
+
+    System.out.println("trying with offline approach:");
     try {
       pngPrintMutableGraph(fileNamePrefix, PrintableGraph.GraphType.valueOf(graphType));
       System.out.println("Created graph png");
@@ -141,11 +155,11 @@ public class CompactionLogDagPrinter extends Handler
 
   public void loadAllCompactionLogs() throws RocksDBException {
     synchronized (this) {
-      // preconditionChecksForLoadAllCompactionLogs();
+      preconditionChecksForLoadAllCompactionLogs();
       addEntriesFromLogFilesToDagAndCompactionLogTable();
       final List<ColumnFamilyHandle> cfHandleList = new ArrayList<>();
-      compactionLogTableCFHandle = cfHandleList.get(4);
       List<ColumnFamilyDescriptor> cfDescList =  RocksDBUtils.getColumnFamilyDescriptors(dbPath);
+      compactionLogTableCFHandle = RocksDBUtils.getColumnFamilyHandle(COMPACTION_LOG_TABLE, cfHandleList);
       activeRocksDB = ManagedRocksDB.openReadOnly(dbPath, cfDescList, cfHandleList);
       try (ManagedRocksIterator managedRocksIterator = new ManagedRocksIterator(
           activeRocksDB.get().newIterator(compactionLogTableCFHandle))) {
@@ -170,7 +184,7 @@ public class CompactionLogDagPrinter extends Handler
       reconstructionSnapshotCreationTime = 0L;
       reconstructionCompactionReason = null;
       try {
-        try (Stream<Path> pathStream = Files.list(Paths.get("compaction-log"))
+        try (Stream<Path> pathStream = Files.list(Paths.get(compactionLogDir))
             .filter(e -> e.toString().toLowerCase()
                 .endsWith(COMPACTION_LOG_FILE_NAME_SUFFIX))
             .sorted()) {
@@ -379,6 +393,16 @@ public class CompactionLogDagPrinter extends Handler
         "Snapshot info log statement has more than expected parameters.");
 
     return Long.parseLong(splits[2]);
+  }
+
+  private void preconditionChecksForLoadAllCompactionLogs() {
+    Preconditions.checkNotNull(compactionLogDir,
+        "Compaction log directory must be set.");
+    Preconditions.checkNotNull(compactionLogTableCFHandle,
+        "compactionLogTableCFHandle must be set before calling " +
+            "loadAllCompactionLogs.");
+    Preconditions.checkNotNull(activeRocksDB,
+        "activeRocksDB must be set before calling loadAllCompactionLogs.");
   }
 
 }
