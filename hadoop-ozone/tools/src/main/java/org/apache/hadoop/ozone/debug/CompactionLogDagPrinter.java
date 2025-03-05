@@ -17,12 +17,28 @@
 
 package org.apache.hadoop.ozone.debug;
 
+import static org.apache.hadoop.ozone.OzoneConsts.COMPACTION_LOG_TABLE;
+import static org.apache.hadoop.ozone.OzoneConsts.DB_COMPACTION_LOG_DIR;
+import static org.apache.hadoop.ozone.OzoneConsts.DB_COMPACTION_SST_BACKUP_DIR;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_DIFF_DIR;
+
 import java.io.IOException;
+import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.List;
 import org.apache.hadoop.hdds.cli.DebugSubcommand;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.shell.Handler;
 import org.apache.hadoop.ozone.shell.OzoneAddress;
+import org.apache.ozone.graph.PrintableGraph;
+import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer;
 import org.kohsuke.MetaInfServices;
+import org.rocksdb.ColumnFamilyDescriptor;
+import org.rocksdb.ColumnFamilyHandle;
+import org.rocksdb.RocksDBException;
 import picocli.CommandLine;
 
 /**
@@ -32,32 +48,53 @@ import picocli.CommandLine;
 @CommandLine.Command(
     name = "print-log-dag",
     aliases = "pld",
-    description = "Create an image of the current compaction log DAG in OM.")
+    description = "Create an image of the current compaction log DAG.")
 @MetaInfServices(DebugSubcommand.class)
 public class CompactionLogDagPrinter extends Handler
     implements DebugSubcommand {
 
-  @CommandLine.Option(names = {"-f", "--file-name-prefix"},
-      description = "Prefix to be use in image file name. (optional)")
-  private String fileNamePrefix;
+  @CommandLine.Option(names = {"-f", "--file-location"},
+      required = true,
+      description = "Path to location at which image will be downloaded. " +
+          "Should include the image file name with \".png\" extension.")
+  private String imageLocation;
+
+  @CommandLine.Option(names = {"--db"},
+      required = true,
+      scope = CommandLine.ScopeType.INHERIT,
+      description = "Path to OM RocksDB")
+  private String dbPath;
 
   // TODO: Change graphType to enum.
   @CommandLine.Option(names = {"-t", "--graph-type"},
-      description = "Type of node name to use in the graph image. " +
-          "(optional)\n Accepted values are: \n" +
-          "  file_name (default) : to use file name as node name in DAG,\n" +
-          "  key_size: to show the no. of keys in the file along with file " +
-          "name in the DAG node name,\n" +
-          "  cumulative_size: to show the cumulative size along with file " +
-          "name in the DAG node name.",
-      defaultValue = "file_name")
+      description = "Type of node name to use in the graph image. (optional)\n Accepted values are: \n" +
+          "  FILE_NAME (default) : to use file name as node name in DAG,\n" +
+          "  KEY_SIZE: to show the no. of keys in the file along with file name in the DAG node name,\n" +
+          "  CUMULATIVE_SIZE: to show the cumulative size along with file name in the DAG node name.",
+      defaultValue = "FILE_NAME")
   private String graphType;
 
   @Override
   protected void execute(OzoneClient client, OzoneAddress address)
       throws IOException {
-    String message = client.getObjectStore()
-        .printCompactionLogDag(fileNamePrefix, graphType);
-    System.out.println(message);
+    try {
+      RocksDBCheckpointDiffer rocksDBCheckpointDiffer;
+      final List<ColumnFamilyHandle> cfHandleList = new ArrayList<>();
+      List<ColumnFamilyDescriptor> cfDescList = RocksDBUtils.getColumnFamilyDescriptors(dbPath);
+      try (ManagedRocksDB db = ManagedRocksDB.openReadOnly(dbPath, cfDescList, cfHandleList)) {
+        ColumnFamilyHandle compactionLogTableCFHandle = RocksDBUtils
+            .getColumnFamilyHandle(COMPACTION_LOG_TABLE, cfHandleList);
+        rocksDBCheckpointDiffer = RocksDBCheckpointDiffer.RocksDBCheckpointDifferHolder
+            .getInstance((Paths.get(dbPath).toFile().getParent() + OM_KEY_PREFIX + OM_SNAPSHOT_DIFF_DIR),
+                DB_COMPACTION_SST_BACKUP_DIR, DB_COMPACTION_LOG_DIR, dbPath, new OzoneConfiguration());
+        rocksDBCheckpointDiffer.setCompactionLogTableCFHandle(compactionLogTableCFHandle);
+        rocksDBCheckpointDiffer.setActiveRocksDB(ManagedRocksDB.openReadOnly(dbPath, cfDescList, cfHandleList));
+        rocksDBCheckpointDiffer.loadAllCompactionLogs();
+        rocksDBCheckpointDiffer.pngPrintMutableGraph(imageLocation, PrintableGraph.GraphType.valueOf(graphType));
+      }
+      System.out.println("Graph was generated at '" + imageLocation + "'.");
+    } catch (RocksDBException ex) {
+      System.err.println("Failed to open RocksDB: " + ex);
+    }
   }
 }
