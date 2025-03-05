@@ -179,12 +179,12 @@ public class RDBStore implements DBStore {
       throw new IOException(msg, e);
     }
 
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("RocksDB successfully opened.");
-      LOG.debug("[Option] dbLocation= {}", dbLocation.getAbsolutePath());
-      LOG.debug("[Option] createIfMissing = {}", dbOptions.createIfMissing());
-      LOG.debug("[Option] maxOpenFiles= {}", dbOptions.maxOpenFiles());
-    }
+    //if (LOG.isDebugEnabled()) {
+      LOG.info("RocksDB successfully opened.");
+      LOG.info("[Option] dbLocation= {}", dbLocation.getAbsolutePath());
+      LOG.info("[Option] createIfMissing = {}", dbOptions.createIfMissing());
+      LOG.info("[Option] maxOpenFiles= {}", dbOptions.maxOpenFiles());
+    //}
   }
 
   public String getSnapshotMetadataDir() {

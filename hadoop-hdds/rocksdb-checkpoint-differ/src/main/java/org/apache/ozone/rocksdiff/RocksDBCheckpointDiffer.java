@@ -755,17 +755,22 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
    * This only needs to be done once during OM startup.
    */
   public void loadAllCompactionLogs() {
+    LOG.info("tej load all");
     synchronized (this) {
+      LOG.info("tej in sync");
       preconditionChecksForLoadAllCompactionLogs();
       addEntriesFromLogFilesToDagAndCompactionLogTable();
+      LOG.info("tej loading graph");
       try (ManagedRocksIterator managedRocksIterator = new ManagedRocksIterator(
           activeRocksDB.get().newIterator(compactionLogTableCFHandle))) {
+        LOG.info("tej in try");
         managedRocksIterator.get().seekToFirst();
         while (managedRocksIterator.get().isValid()) {
           byte[] value = managedRocksIterator.get().value();
           CompactionLogEntry compactionLogEntry =
               CompactionLogEntry.getFromProtobuf(
                   CompactionLogEntryProto.parseFrom(value));
+          LOG.info("tej iterating cf " + compactionLogEntry.getDbSequenceNumber());
           populateCompactionDAG(compactionLogEntry.getInputFileInfoList(),
               compactionLogEntry.getOutputFileInfoList(),
               compactionLogEntry.getDbSequenceNumber());

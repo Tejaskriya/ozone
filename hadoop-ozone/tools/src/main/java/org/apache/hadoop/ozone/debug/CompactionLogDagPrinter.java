@@ -19,6 +19,8 @@ package org.apache.hadoop.ozone.debug;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.ozone.OzoneConsts.COMPACTION_LOG_TABLE;
+import static org.apache.hadoop.ozone.OzoneConsts.DB_COMPACTION_LOG_DIR;
+import static org.apache.hadoop.ozone.OzoneConsts.DB_COMPACTION_SST_BACKUP_DIR;
 
 import com.google.common.base.Preconditions;
 import com.google.common.graph.GraphBuilder;
@@ -37,18 +39,22 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.hadoop.hdds.cli.DebugSubcommand;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedSstFileReader;
 import org.apache.hadoop.ozone.client.OzoneClient;
+import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.shell.Handler;
 import org.apache.hadoop.ozone.shell.OzoneAddress;
 import org.apache.ozone.compaction.log.CompactionFileInfo;
 import org.apache.ozone.compaction.log.CompactionLogEntry;
 import org.apache.ozone.graph.PrintableGraph;
 import org.apache.ozone.rocksdiff.CompactionNode;
+import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer;
 import org.kohsuke.MetaInfServices;
 import org.rocksdb.ColumnFamilyDescriptor;
 import org.rocksdb.ColumnFamilyHandle;
@@ -84,6 +90,12 @@ public class CompactionLogDagPrinter extends Handler
       description = "compaction-log directory Path")
   private String compactionLogDir;
 
+  @CommandLine.Option(names = {"--snapshot-dir"},
+      required = true,
+      scope = CommandLine.ScopeType.INHERIT,
+      description = "compaction-log directory Path")
+  private String snapshotDir;
+
   // TODO: Change graphType to enum.
   @CommandLine.Option(names = {"-t", "--graph-type"},
       description = "Type of node name to use in the graph image. " +
@@ -100,19 +112,57 @@ public class CompactionLogDagPrinter extends Handler
   protected void execute(OzoneClient client, OzoneAddress address)
       throws IOException {
 
-    System.out.println("trying with om client call:");
-    String message = client.getObjectStore()
-        .printCompactionLogDag(fileNamePrefix, graphType);
-    System.out.println(message);
+    System.out.println("----trying with om client call:");
+    try {
+      String message = client.getObjectStore()
+          .printCompactionLogDag(fileNamePrefix, graphType);
+      System.out.println(message);
+    } catch (IOException ex) {
+      System.err.println("tej Failed om request");
+    }
 
-    System.out.println("trying with offline approach:");
+    System.out.println("----trying with offline approach:");
     try {
       pngPrintMutableGraph(fileNamePrefix, PrintableGraph.GraphType.valueOf(graphType));
       System.out.println("Created graph png");
     } catch (RocksDBException ex) {
-      throw new IOException(ex);
+      //throw new IOException(ex);
+      System.err.println("tej Failed to offline");
     }
 
+    System.out.println("----trying with RocksDBCheckpointDiffer approach:");
+    try {
+      RocksDBCheckpointDiffer rdbcd = RocksDBCheckpointDiffer.RocksDBCheckpointDifferHolder.getInstance(snapshotDir,
+          DB_COMPACTION_SST_BACKUP_DIR, DB_COMPACTION_LOG_DIR, dbPath, new OzoneConfiguration());
+      rdbcd.setCompactionLogTableCFHandle(setActiveDBAndCompactionCfHandler());
+      System.out.println("tej set cf handle");
+      final List<ColumnFamilyHandle> cfHandleList = new ArrayList<>();
+      List<ColumnFamilyDescriptor> cfDescList =  RocksDBUtils.getColumnFamilyDescriptors(dbPath);
+      rdbcd.setActiveRocksDB(ManagedRocksDB.openReadOnly(dbPath, cfDescList, cfHandleList));
+      rdbcd.loadAllCompactionLogs();
+      rdbcd.pngPrintMutableGraph(fileNamePrefix + "rdbd", PrintableGraph.GraphType.valueOf(graphType));
+    } catch (RocksDBException ex) {
+      System.err.println("tej Failed to get cfHandler");
+    } catch (IOException ex) {
+      System.err.println("tej IOE: " + ex);
+    }
+
+
+    System.out.println("----trying with DBStore approach:");
+    try {
+      DBStore dbStore = OmMetadataManagerImpl.loadDB(new OzoneConfiguration(), Paths.get(dbPath).toFile(), 0);
+      dbStore.getTable("fileTable");
+      System.out.println("tej dbStore names: " + dbStore.getTableNames());
+      RocksDBCheckpointDiffer rcd = dbStore.getRocksDBCheckpointDiffer();
+      rcd.setCompactionLogTableCFHandle(setActiveDBAndCompactionCfHandler());
+      System.out.println("tej set cf handle");
+      rcd.loadAllCompactionLogs();
+      rcd.pngPrintMutableGraph(fileNamePrefix, PrintableGraph.GraphType.valueOf(graphType));
+    } catch (RocksDBException ex) {
+      System.err.println("tej Failed to get cfHandler");
+    } catch (IOException ex) {
+      System.err.println("tej IOE: " + ex);
+    }
   }
 
   private final MutableGraph<CompactionNode> backwardCompactionDAG =
@@ -153,11 +203,7 @@ public class CompactionLogDagPrinter extends Handler
 
   public void loadAllCompactionLogs() throws RocksDBException {
     synchronized (this) {
-      final List<ColumnFamilyHandle> cfHandleList = new ArrayList<>();
-      List<ColumnFamilyDescriptor> cfDescList =  RocksDBUtils.getColumnFamilyDescriptors(dbPath);
-      activeRocksDB = ManagedRocksDB.openReadOnly(dbPath, cfDescList, cfHandleList);
-      compactionLogTableCFHandle = RocksDBUtils.getColumnFamilyHandle(COMPACTION_LOG_TABLE, cfHandleList);
-
+      setActiveDBAndCompactionCfHandler();
       preconditionChecksForLoadAllCompactionLogs();
       addEntriesFromLogFilesToDagAndCompactionLogTable();
       try (ManagedRocksIterator managedRocksIterator = new ManagedRocksIterator(
@@ -177,6 +223,14 @@ public class CompactionLogDagPrinter extends Handler
         throw new RuntimeException(e);
       }
     }
+  }
+
+  private ColumnFamilyHandle setActiveDBAndCompactionCfHandler() throws RocksDBException {
+    final List<ColumnFamilyHandle> cfHandleList = new ArrayList<>();
+    List<ColumnFamilyDescriptor> cfDescList =  RocksDBUtils.getColumnFamilyDescriptors(dbPath);
+    activeRocksDB = ManagedRocksDB.openReadOnly(dbPath, cfDescList, cfHandleList);
+    compactionLogTableCFHandle = RocksDBUtils.getColumnFamilyHandle(COMPACTION_LOG_TABLE, cfHandleList);
+    return compactionLogTableCFHandle;
   }
   public void addEntriesFromLogFilesToDagAndCompactionLogTable() {
     synchronized (this) {
