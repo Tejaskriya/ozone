@@ -71,7 +71,7 @@ public final class PopulateCompactionTable {
   }
 
   public void addEntriesFromLogFilesToDagAndCompactionLogTable() {
-    preconditionChecksForLoadAllCompactionLogs();
+    preconditionChecksForLoadAllCompactionLogs(true);
     try {
       try (Stream<Path> pathStream = Files.list(Paths.get(compactionLogDir))
           .filter(e -> e.toString().toLowerCase()
@@ -206,9 +206,11 @@ public final class PopulateCompactionTable {
     return Long.parseLong(splits[2]);
   }
 
-  public void preconditionChecksForLoadAllCompactionLogs() {
-    Preconditions.checkNotNull(compactionLogDir,
-        "Compaction log directory must be set.");
+  public void preconditionChecksForLoadAllCompactionLogs(boolean checkCompactionLog) {
+    if (checkCompactionLog) {
+      Preconditions.checkNotNull(compactionLogDir,
+          "Compaction log directory must be set.");
+    }
     Preconditions.checkNotNull(compactionLogTableCFHandle,
         "compactionLogTableCFHandle must be set before calling " +
             "loadAllCompactionLogs.");

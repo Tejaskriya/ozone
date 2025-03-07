@@ -51,7 +51,9 @@ import picocli.CommandLine;
 @CommandLine.Command(
     name = "print-log-dag",
     aliases = "pld",
-    description = "Create an image of the current compaction log DAG.")
+    description = "Create an image of the current compaction log DAG. " +
+        "This command is an offline command. i.e., it can run on any instance of om.db " +
+        "and does not require OM to be up.")
 public class CompactionLogDagPrinter extends AbstractSubcommand implements Callable<Void> {
 
   @CommandLine.Option(names = {"-o", "--output-file"},
@@ -67,7 +69,6 @@ public class CompactionLogDagPrinter extends AbstractSubcommand implements Calla
   private String dbPath;
 
   @CommandLine.Option(names = {"--compaction-log"},
-      required = true,
       scope = CommandLine.ScopeType.INHERIT,
       description = "Path to compaction-log directory.")
   private String compactionLogDir;
@@ -125,9 +126,11 @@ public class CompactionLogDagPrinter extends AbstractSubcommand implements Calla
       graph.generateImage(filePath);
     }
 
-    public void loadAllCompactionLogs() throws RocksDBException {
-      populateCompactionTable.preconditionChecksForLoadAllCompactionLogs();
-      populateCompactionTable.addEntriesFromLogFilesToDagAndCompactionLogTable();
+    public void loadAllCompactionLogs() {
+      populateCompactionTable.preconditionChecksForLoadAllCompactionLogs(false);
+      if (compactionLogDir != null) {
+        populateCompactionTable.addEntriesFromLogFilesToDagAndCompactionLogTable();
+      }
       try (ManagedRocksIterator managedRocksIterator = new ManagedRocksIterator(
           activeRocksDB.get().newIterator(compactionLogTableCFHandle))) {
         managedRocksIterator.get().seekToFirst();
@@ -184,9 +187,9 @@ public class CompactionLogDagPrinter extends AbstractSubcommand implements Calla
       try {
         numKeys = populateCompactionTable.getSSTFileSummary(file, dbPath);
       } catch (RocksDBException e) {
-        err().println("Can't get num of keys in SST '" + file + "': " + e.getMessage());
+        err().println("Warning: Can't get num of keys in SST '" + file + "'. Reason: " + e.getMessage());
       } catch (FileNotFoundException e) {
-        out().println("Can't find SST : " + file);
+        out().println("Warning: Can't find SST : " + file);
       }
 
       CompactionNode fileNode = new CompactionNode(file, numKeys,

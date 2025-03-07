@@ -588,7 +588,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
   public void loadAllCompactionLogs() {
     synchronized (this) {
       populateCompactionTable
-          .preconditionChecksForLoadAllCompactionLogs();
+          .preconditionChecksForLoadAllCompactionLogs(true);
       populateCompactionTable.addEntriesFromLogFilesToDagAndCompactionLogTable();
       try (ManagedRocksIterator managedRocksIterator = new ManagedRocksIterator(
           activeRocksDB.get().newIterator(compactionLogTableCFHandle))) {
