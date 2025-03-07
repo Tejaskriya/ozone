@@ -29,6 +29,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
+import org.apache.hadoop.hdds.cli.AbstractSubcommand;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator;
@@ -51,9 +52,9 @@ import picocli.CommandLine;
     name = "print-log-dag",
     aliases = "pld",
     description = "Create an image of the current compaction log DAG.")
-public class CompactionLogDagPrinter implements Callable<Void> {
+public class CompactionLogDagPrinter extends AbstractSubcommand implements Callable<Void> {
 
-  @CommandLine.Option(names = {"-f", "--file-location"},
+  @CommandLine.Option(names = {"-o", "--output-file"},
       required = true,
       description = "Path to location at which image will be downloaded. " +
           "Should include the image file name with \".png\" extension.")
@@ -83,13 +84,11 @@ public class CompactionLogDagPrinter implements Callable<Void> {
   @Override
   public Void call() throws Exception {
     try {
-      System.out.println("tej enter try ");
       CreateCompactionDag createCompactionDag = new CreateCompactionDag(dbPath, compactionLogDir);
-      System.out.println("tej create compactDag obj");
       createCompactionDag.pngPrintMutableGraph(imageLocation, PrintableGraph.GraphType.valueOf(graphType));
-      System.out.println("Graph was generated at '" + imageLocation + "'.");
+      out().println("Graph was generated at '" + imageLocation + "'.");
     } catch (RocksDBException ex) {
-      System.err.println("Failed to open RocksDB: " + ex);
+      err().println("Failed to open RocksDB: " + ex);
       throw new IOException(ex);
     }
     return null;
@@ -109,49 +108,34 @@ public class CompactionLogDagPrinter implements Callable<Void> {
     CreateCompactionDag(String dbPath, String compactDir) throws RocksDBException {
       final List<ColumnFamilyHandle> cfHandleList = new ArrayList<>();
       List<ColumnFamilyDescriptor> cfDescList = RocksDBUtils.getColumnFamilyDescriptors(dbPath);
-      System.out.println("tej get desc");
       activeRocksDB = ManagedRocksDB.openReadOnly(dbPath, cfDescList, cfHandleList);
-      System.out.println("tej open db");
       compactionLogTableCFHandle = RocksDBUtils.getColumnFamilyHandle(COMPACTION_LOG_TABLE, cfHandleList);
-      System.out.println("tej get handle");
       populateCompactionTable = new PopulateCompactionTable(compactDir, activeRocksDB, compactionLogTableCFHandle);
-      System.out.println("tej populate obj");
     }
 
     public void pngPrintMutableGraph(String filePath, PrintableGraph.GraphType gType)
         throws IOException, RocksDBException {
-      System.out.println("tej start pnt");
       Objects.requireNonNull(filePath, "Image file path is required.");
       Objects.requireNonNull(gType, "Graph type is required.");
 
-      System.out.println("tej start loading");
       loadAllCompactionLogs();
 
       PrintableGraph graph;
-      synchronized (this) {
-        graph = new PrintableGraph(backwardCompactionDAG, gType);
-      }
-
+      graph = new PrintableGraph(backwardCompactionDAG, gType);
       graph.generateImage(filePath);
     }
 
     public void loadAllCompactionLogs() throws RocksDBException {
-      System.out.println("tej check precond ");
       populateCompactionTable.preconditionChecksForLoadAllCompactionLogs();
-      System.out.println("tej add entries");
       populateCompactionTable.addEntriesFromLogFilesToDagAndCompactionLogTable();
-      System.out.println("tej iterate through db");
       try (ManagedRocksIterator managedRocksIterator = new ManagedRocksIterator(
           activeRocksDB.get().newIterator(compactionLogTableCFHandle))) {
-        System.out.println("tej in iter try");
         managedRocksIterator.get().seekToFirst();
         while (managedRocksIterator.get().isValid()) {
-          System.out.println("tej in loooop");
           byte[] value = managedRocksIterator.get().value();
           CompactionLogEntry compactionLogEntry =
               CompactionLogEntry.getFromProtobuf(
                   HddsProtos.CompactionLogEntryProto.parseFrom(value));
-          System.out.println("tej populate the damn dag");
           populateCompactionDAG(compactionLogEntry.getInputFileInfoList(),
               compactionLogEntry.getOutputFileInfoList(),
               compactionLogEntry.getDbSequenceNumber());
@@ -172,12 +156,8 @@ public class CompactionLogDagPrinter implements Callable<Void> {
                                        List<CompactionFileInfo> outputFiles,
                                        long seqNum) {
 
-      //System.out.println("Input files: {} -> Output files: {}", inputFiles, outputFiles);
-      System.out.println("tej in populate");
-
       for (CompactionFileInfo outfile : outputFiles) {
 
-        System.out.println("tej in loop of dag pop");
         final CompactionNode outfileNode = compactionNodeMap.computeIfAbsent(
             outfile.getFileName(),
             file -> addNodeToDAG(file, seqNum, outfile.getStartKey(),
@@ -200,14 +180,13 @@ public class CompactionLogDagPrinter implements Callable<Void> {
 
     private CompactionNode addNodeToDAG(String file, long seqNum, String startKey,
                                         String endKey, String columnFamily) {
-      System.out.println("tej in add node to dag:" + file);
       long numKeys = 0L;
       try {
         numKeys = populateCompactionTable.getSSTFileSummary(file, dbPath);
       } catch (RocksDBException e) {
-        System.err.println("Can't get num of keys in SST '" + file + "': " + e.getMessage());
+        err().println("Can't get num of keys in SST '" + file + "': " + e.getMessage());
       } catch (FileNotFoundException e) {
-        System.out.println("Can't find SST : " + file);
+        out().println("Can't find SST : " + file);
       }
 
       CompactionNode fileNode = new CompactionNode(file, numKeys,

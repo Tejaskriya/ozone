@@ -1199,7 +1199,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
   }
 
   @VisibleForTesting
-  public PopulateCompactionTable getPopulateCompactionTable() {
+  PopulateCompactionTable getPopulateCompactionTable() {
     return populateCompactionTable;
   }
 

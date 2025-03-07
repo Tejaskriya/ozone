@@ -218,7 +218,6 @@ public final class PopulateCompactionTable {
 
   public long getSSTFileSummary(String filename, String dbPath)
       throws RocksDBException, FileNotFoundException {
-    LOG.info("tej get summary");
 
     if (!filename.endsWith(".sst")) {
       filename += ".sst";
