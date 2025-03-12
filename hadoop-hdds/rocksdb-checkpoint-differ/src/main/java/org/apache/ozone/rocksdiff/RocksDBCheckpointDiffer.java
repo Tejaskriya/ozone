@@ -21,6 +21,13 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_COMPACTI
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_COMPACTION_DAG_MAX_TIME_ALLOWED_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_COMPACTION_DAG_PRUNE_DAEMON_RUN_INTERVAL;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_PRUNE_COMPACTION_DAG_DAEMON_RUN_INTERVAL_DEFAULT;
+import static org.apache.ozone.compaction.log.RocksDBConsts.COLUMN_FAMILIES_TO_TRACK_IN_DAG;
+import static org.apache.ozone.compaction.log.RocksDBConsts.DEBUG_DAG_BUILD_UP;
+import static org.apache.ozone.compaction.log.RocksDBConsts.DEBUG_DAG_LIVE_NODES;
+import static org.apache.ozone.compaction.log.RocksDBConsts.DEBUG_DAG_TRAVERSAL;
+import static org.apache.ozone.compaction.log.RocksDBConsts.SPACE_DELIMITER;
+import static org.apache.ozone.compaction.log.RocksDBConsts.SST_FILE_EXTENSION;
+import static org.apache.ozone.compaction.log.RocksDBConsts.SST_FILE_EXTENSION_LENGTH;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
@@ -70,7 +77,6 @@ import org.apache.hadoop.ozone.lock.BootstrapStateHandler;
 import org.apache.ozone.compaction.log.CompactionFileInfo;
 import org.apache.ozone.compaction.log.CompactionLogEntry;
 import org.apache.ozone.compaction.log.PopulateCompactionTable;
-import org.apache.ozone.compaction.log.RocksDBConsts;
 import org.apache.ozone.graph.PrintableGraph;
 import org.apache.ozone.graph.PrintableGraph.GraphType;
 import org.apache.ozone.rocksdb.util.RdbUtil;
@@ -271,9 +277,9 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
   private static final HashSet<Integer> DEBUG_LEVEL = new HashSet<>();
 
   static {
-    addDebugLevel(RocksDBConsts.DEBUG_DAG_BUILD_UP);
-    addDebugLevel(RocksDBConsts.DEBUG_DAG_TRAVERSAL);
-    addDebugLevel(RocksDBConsts.DEBUG_DAG_LIVE_NODES);
+    addDebugLevel(DEBUG_DAG_BUILD_UP);
+    addDebugLevel(DEBUG_DAG_TRAVERSAL);
+    addDebugLevel(DEBUG_DAG_LIVE_NODES);
   }
 
   static {
@@ -364,7 +370,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
                                List<String> outputFiles) {
     String columnFamily = StringUtils.bytes2String(columnFamilyBytes);
 
-    if (!RocksDBConsts.COLUMN_FAMILIES_TO_TRACK_IN_DAG.contains(columnFamily)) {
+    if (!COLUMN_FAMILIES_TO_TRACK_IN_DAG.contains(columnFamily)) {
       LOG.debug("Skipping compaction for columnFamily: {}", columnFamily);
       return true;
     }
@@ -501,8 +507,8 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
   private long getSSTFileSummary(String filename)
       throws RocksDBException, FileNotFoundException {
 
-    if (!filename.endsWith(RocksDBConsts.SST_FILE_EXTENSION)) {
-      filename += RocksDBConsts.SST_FILE_EXTENSION;
+    if (!filename.endsWith(SST_FILE_EXTENSION)) {
+      filename += SST_FILE_EXTENSION;
     }
 
     try (ManagedOptions option = new ManagedOptions();
@@ -520,8 +526,8 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
 
   private String getAbsoluteSstFilePath(String filename)
       throws FileNotFoundException {
-    if (!filename.endsWith(RocksDBConsts.SST_FILE_EXTENSION)) {
-      filename += RocksDBConsts.SST_FILE_EXTENSION;
+    if (!filename.endsWith(SST_FILE_EXTENSION)) {
+      filename += SST_FILE_EXTENSION;
     }
     File sstFile = new File(sstBackupDir + filename);
     File sstFileInActiveDB = new File(activeDBLocationStr + filename);
@@ -544,15 +550,15 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
       LOG.error(errorMsg);
       throw new RuntimeException(errorMsg);
     }
-    if (!filename.endsWith(RocksDBConsts.SST_FILE_EXTENSION)) {
+    if (!filename.endsWith(SST_FILE_EXTENSION)) {
       final String errorMsg = String.format(
           "Invalid extension of file: '%s'. Expected '%s'",
-          filename, RocksDBConsts.SST_FILE_EXTENSION_LENGTH);
+          filename, SST_FILE_EXTENSION_LENGTH);
       LOG.error(errorMsg);
       throw new RuntimeException(errorMsg);
     }
     return filename.substring("/".length(),
-        filename.length() - RocksDBConsts.SST_FILE_EXTENSION_LENGTH);
+        filename.length() - SST_FILE_EXTENSION_LENGTH);
   }
 
   /**
@@ -620,7 +626,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
 
     // Try to locate the SST in the backup dir first
     final Path sstPathInBackupDir = Paths.get(sstBackupDir,
-        sstFilenameWithoutExtension + RocksDBConsts.SST_FILE_EXTENSION);
+        sstFilenameWithoutExtension + SST_FILE_EXTENSION);
     if (Files.exists(sstPathInBackupDir)) {
       return sstPathInBackupDir.toString();
     }
@@ -630,7 +636,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
     // src DB directory or destDB directory
     for (String dbPath : dbPaths) {
       final Path sstPathInDBDir = Paths.get(dbPath,
-          sstFilenameWithoutExtension + RocksDBConsts.SST_FILE_EXTENSION);
+          sstFilenameWithoutExtension + SST_FILE_EXTENSION);
       if (Files.exists(sstPathInDBDir)) {
         return sstPathInDBDir.toString();
       }
@@ -665,7 +671,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
             sst -> {
               String sstFullPath = getSSTFullPath(sst, src.getDbPath(), dest.getDbPath());
               Path link = Paths.get(sstFilesDirForSnapDiffJob,
-                  sst + RocksDBConsts.SST_FILE_EXTENSION);
+                  sst + SST_FILE_EXTENSION);
               Path srcFile = Paths.get(sstFullPath);
               createLink(link, srcFile);
               return link.toString();
@@ -707,14 +713,14 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
 
       logSB.append("Fwd DAG same SST files:      ");
       for (String file : fwdDAGSameFiles) {
-        logSB.append(file).append(RocksDBConsts.SPACE_DELIMITER);
+        logSB.append(file).append(SPACE_DELIMITER);
       }
       LOG.debug(logSB.toString());
 
       logSB.setLength(0);
       logSB.append("Fwd DAG different SST files: ");
       for (String file : fwdDAGDifferentFiles) {
-        logSB.append(file).append(RocksDBConsts.SPACE_DELIMITER);
+        logSB.append(file).append(SPACE_DELIMITER);
       }
       LOG.debug("{}", logSB);
     }
@@ -1028,7 +1034,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
   private void removeSstFiles(Set<String> sstFileNodes) {
     for (String sstFileNode: sstFileNodes) {
       File file =
-          new File(sstBackupDir + "/" + sstFileNode + RocksDBConsts.SST_FILE_EXTENSION);
+          new File(sstBackupDir + "/" + sstFileNode + SST_FILE_EXTENSION);
       try {
         Files.deleteIfExists(file.toPath());
       } catch (IOException exception) {

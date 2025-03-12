@@ -18,6 +18,14 @@
 package org.apache.ozone.compaction.log;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.apache.ozone.compaction.log.RocksDBConsts.COMPACTION_LOG_COMMENT_LINE_PREFIX;
+import static org.apache.ozone.compaction.log.RocksDBConsts.COMPACTION_LOG_ENTRY_FILE_DELIMITER;
+import static org.apache.ozone.compaction.log.RocksDBConsts.COMPACTION_LOG_ENTRY_INPUT_OUTPUT_FILES_DELIMITER;
+import static org.apache.ozone.compaction.log.RocksDBConsts.COMPACTION_LOG_ENTRY_LINE_PREFIX;
+import static org.apache.ozone.compaction.log.RocksDBConsts.COMPACTION_LOG_FILE_NAME_SUFFIX;
+import static org.apache.ozone.compaction.log.RocksDBConsts.COMPACTION_LOG_SEQ_NUM_LINE_PREFIX;
+import static org.apache.ozone.compaction.log.RocksDBConsts.LONG_MAX_STR_LEN;
+import static org.apache.ozone.compaction.log.RocksDBConsts.SPACE_DELIMITER;
 
 import com.google.common.base.Preconditions;
 import java.io.FileNotFoundException;
@@ -75,7 +83,7 @@ public final class PopulateCompactionTable {
     try {
       try (Stream<Path> pathStream = Files.list(Paths.get(compactionLogDir))
           .filter(e -> e.toString().toLowerCase()
-              .endsWith(RocksDBConsts.COMPACTION_LOG_FILE_NAME_SUFFIX))
+              .endsWith(COMPACTION_LOG_FILE_NAME_SUFFIX))
           .sorted()) {
         for (Path logPath : pathStream.collect(Collectors.toList())) {
           readCompactionLogFile(logPath.toString());
@@ -110,16 +118,16 @@ public final class PopulateCompactionTable {
    */
   public void processCompactionLogLine(String line) {
     LOG.debug("Processing line: {}", line);
-    if (line.startsWith(RocksDBConsts.COMPACTION_LOG_COMMENT_LINE_PREFIX)) {
+    if (line.startsWith(COMPACTION_LOG_COMMENT_LINE_PREFIX)) {
       reconstructionCompactionReason =
-          line.substring(RocksDBConsts.COMPACTION_LOG_COMMENT_LINE_PREFIX.length());
-    } else if (line.startsWith(RocksDBConsts.COMPACTION_LOG_SEQ_NUM_LINE_PREFIX)) {
+          line.substring(COMPACTION_LOG_COMMENT_LINE_PREFIX.length());
+    } else if (line.startsWith(COMPACTION_LOG_SEQ_NUM_LINE_PREFIX)) {
       reconstructionSnapshotCreationTime = getSnapshotCreationTimeFromLogLine(line);
-    } else if (line.startsWith(RocksDBConsts.COMPACTION_LOG_ENTRY_LINE_PREFIX)) {
+    } else if (line.startsWith(COMPACTION_LOG_ENTRY_LINE_PREFIX)) {
       // Compaction log entry is like following:
       // C sequence_number input_files:output_files
       // where input_files and output_files are joined by ','.
-      String[] lineSpilt = line.split(RocksDBConsts.SPACE_DELIMITER);
+      String[] lineSpilt = line.split(SPACE_DELIMITER);
       if (lineSpilt.length != 3) {
         LOG.error("Invalid line in compaction log: {}", line);
         return;
@@ -127,7 +135,7 @@ public final class PopulateCompactionTable {
 
       String dbSequenceNumber = lineSpilt[1];
       String[] io = lineSpilt[2]
-          .split(RocksDBConsts.COMPACTION_LOG_ENTRY_INPUT_OUTPUT_FILES_DELIMITER);
+          .split(COMPACTION_LOG_ENTRY_INPUT_OUTPUT_FILES_DELIMITER);
       if (io.length != 2) {
         if (line.endsWith(":")) {
           LOG.debug("Ignoring compaction log line for SST deletion");
@@ -137,8 +145,8 @@ public final class PopulateCompactionTable {
         return;
       }
 
-      String[] inputFiles = io[0].split(RocksDBConsts.COMPACTION_LOG_ENTRY_FILE_DELIMITER);
-      String[] outputFiles = io[1].split(RocksDBConsts.COMPACTION_LOG_ENTRY_FILE_DELIMITER);
+      String[] inputFiles = io[0].split(COMPACTION_LOG_ENTRY_FILE_DELIMITER);
+      String[] outputFiles = io[1].split(COMPACTION_LOG_ENTRY_FILE_DELIMITER);
       CompactionLogEntry logEntry = createCompactionLogEntry(Long.parseLong(dbSequenceNumber),
           reconstructionSnapshotCreationTime, inputFiles, outputFiles, reconstructionCompactionReason);
       addToCompactionLogTable(logEntry, activeRocksDB, compactionLogTableCFHandle);
@@ -172,10 +180,10 @@ public final class PopulateCompactionTable {
     String dbSequenceIdStr =
         String.valueOf(compactionLogEntry.getDbSequenceNumber());
 
-    if (dbSequenceIdStr.length() < RocksDBConsts.LONG_MAX_STR_LEN) {
+    if (dbSequenceIdStr.length() < LONG_MAX_STR_LEN) {
       // Pad zeroes to the left to make sure it is lexicographic ordering.
       dbSequenceIdStr = org.apache.commons.lang3.StringUtils.leftPad(
-          dbSequenceIdStr, RocksDBConsts.LONG_MAX_STR_LEN, "0");
+          dbSequenceIdStr, LONG_MAX_STR_LEN, "0");
     }
 
     // Key in the transactionId-currentTime
@@ -197,9 +205,9 @@ public final class PopulateCompactionTable {
 
   public long getSnapshotCreationTimeFromLogLine(String logLine) {
     // Remove `S ` from the line.
-    String line = logLine.substring(RocksDBConsts.COMPACTION_LOG_SEQ_NUM_LINE_PREFIX.length());
+    String line = logLine.substring(COMPACTION_LOG_SEQ_NUM_LINE_PREFIX.length());
 
-    String[] splits = line.split(RocksDBConsts.SPACE_DELIMITER);
+    String[] splits = line.split(SPACE_DELIMITER);
     Preconditions.checkArgument(splits.length == 3,
         "Snapshot info log statement has more than expected parameters.");
 

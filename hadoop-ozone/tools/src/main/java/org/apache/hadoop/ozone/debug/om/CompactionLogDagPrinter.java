@@ -49,8 +49,8 @@ import picocli.CommandLine;
  * ozone debug om print-log-dag.
  */
 @CommandLine.Command(
-    name = "print-log-dag",
-    aliases = "pld",
+    name = "print-compaction-dag",
+    aliases = "pcd",
     description = "Create an image of the current compaction log DAG. " +
         "This command is an offline command. i.e., it can run on any instance of om.db " +
         "and does not require OM to be up.")
