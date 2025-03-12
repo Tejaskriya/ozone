@@ -34,9 +34,9 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator;
 import org.apache.hadoop.ozone.debug.RocksDBUtils;
+import org.apache.ozone.compaction.log.CompactionDagHelper;
 import org.apache.ozone.compaction.log.CompactionFileInfo;
 import org.apache.ozone.compaction.log.CompactionLogEntry;
-import org.apache.ozone.compaction.log.PopulateCompactionTable;
 import org.apache.ozone.graph.PrintableGraph;
 import org.apache.ozone.rocksdiff.CompactionNode;
 import org.rocksdb.ColumnFamilyDescriptor;
@@ -46,7 +46,7 @@ import picocli.CommandLine;
 
 /**
  * Handler to generate image for current compaction DAG in the OM leader node.
- * ozone debug om print-log-dag.
+ * ozone debug om print-compaction-dag.
  */
 @CommandLine.Command(
     name = "print-compaction-dag",
@@ -104,14 +104,14 @@ public class CompactionLogDagPrinter extends AbstractSubcommand implements Calla
 
     private ColumnFamilyHandle compactionLogTableCFHandle;
     private ManagedRocksDB activeRocksDB;
-    private PopulateCompactionTable populateCompactionTable;
+    private CompactionDagHelper compactionDagHelper;
 
     CreateCompactionDag(String dbPath, String compactDir) throws RocksDBException {
       final List<ColumnFamilyHandle> cfHandleList = new ArrayList<>();
       List<ColumnFamilyDescriptor> cfDescList = RocksDBUtils.getColumnFamilyDescriptors(dbPath);
       activeRocksDB = ManagedRocksDB.openReadOnly(dbPath, cfDescList, cfHandleList);
       compactionLogTableCFHandle = RocksDBUtils.getColumnFamilyHandle(COMPACTION_LOG_TABLE, cfHandleList);
-      populateCompactionTable = new PopulateCompactionTable(compactDir, activeRocksDB, compactionLogTableCFHandle);
+      compactionDagHelper = new CompactionDagHelper(compactDir, activeRocksDB, compactionLogTableCFHandle);
     }
 
     public void pngPrintMutableGraph(String filePath, PrintableGraph.GraphType gType)
@@ -127,9 +127,9 @@ public class CompactionLogDagPrinter extends AbstractSubcommand implements Calla
     }
 
     public void loadAllCompactionLogs() {
-      populateCompactionTable.preconditionChecksForLoadAllCompactionLogs(false);
+      compactionDagHelper.preconditionChecksForLoadAllCompactionLogs(false);
       if (compactionLogDir != null) {
-        populateCompactionTable.addEntriesFromLogFilesToDagAndCompactionLogTable();
+        compactionDagHelper.addEntriesFromLogFilesToCompactionLogTable();
       }
       try (ManagedRocksIterator managedRocksIterator = new ManagedRocksIterator(
           activeRocksDB.get().newIterator(compactionLogTableCFHandle))) {
@@ -185,7 +185,7 @@ public class CompactionLogDagPrinter extends AbstractSubcommand implements Calla
                                         String endKey, String columnFamily) {
       long numKeys = 0L;
       try {
-        numKeys = populateCompactionTable.getSSTFileSummary(file, dbPath);
+        numKeys = CompactionDagHelper.getSSTFileSummary(dbPath + "/" + file);
       } catch (RocksDBException e) {
         err().println("Warning: Can't get num of keys in SST '" + file + "'. Reason: " + e.getMessage());
       } catch (FileNotFoundException e) {

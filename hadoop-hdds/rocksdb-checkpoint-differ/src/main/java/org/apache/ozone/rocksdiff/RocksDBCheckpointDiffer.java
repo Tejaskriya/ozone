@@ -69,14 +69,12 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.CompactionLogEntryProto;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.Scheduler;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
-import org.apache.hadoop.hdds.utils.db.managed.ManagedOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator;
-import org.apache.hadoop.hdds.utils.db.managed.ManagedSstFileReader;
 import org.apache.hadoop.ozone.lock.BootstrapStateHandler;
+import org.apache.ozone.compaction.log.CompactionDagHelper;
 import org.apache.ozone.compaction.log.CompactionFileInfo;
 import org.apache.ozone.compaction.log.CompactionLogEntry;
-import org.apache.ozone.compaction.log.PopulateCompactionTable;
 import org.apache.ozone.graph.PrintableGraph;
 import org.apache.ozone.graph.PrintableGraph.GraphType;
 import org.apache.ozone.rocksdb.util.RdbUtil;
@@ -86,7 +84,6 @@ import org.rocksdb.CompactionJobInfo;
 import org.rocksdb.LiveFileMetaData;
 import org.rocksdb.RocksDB;
 import org.rocksdb.RocksDBException;
-import org.rocksdb.TableProperties;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -125,7 +122,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
   private ColumnFamilyHandle compactionLogTableCFHandle;
   private ManagedRocksDB activeRocksDB;
   private ConcurrentMap<String, CompactionFileInfo> inflightCompactions;
-  private PopulateCompactionTable populateCompactionTable;
+  private CompactionDagHelper compactionDagHelper;
 
 
 
@@ -193,8 +190,8 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
       this.scheduler = null;
     }
     this.inflightCompactions = new ConcurrentHashMap<>();
-    this.populateCompactionTable =
-        new PopulateCompactionTable(compactionLogDir, activeRocksDB, compactionLogTableCFHandle);
+    this.compactionDagHelper =
+        new CompactionDagHelper(compactionLogDir, activeRocksDB, compactionLogTableCFHandle);
   }
 
   private String createCompactionLogDir(String metadataDirName,
@@ -317,7 +314,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
     Preconditions.checkNotNull(compactionLogTableCFHandle,
         "Column family handle should not be null");
     this.compactionLogTableCFHandle = compactionLogTableCFHandle;
-    this.populateCompactionTable.setCompactionLogTableCFHandle(compactionLogTableCFHandle);
+    this.compactionDagHelper.setCompactionLogTableCFHandle(compactionLogTableCFHandle);
   }
 
   /**
@@ -327,7 +324,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
   public synchronized void setActiveRocksDB(ManagedRocksDB activeRocksDB) {
     Preconditions.checkNotNull(activeRocksDB, "RocksDB should not be null.");
     this.activeRocksDB = activeRocksDB;
-    this.populateCompactionTable.setActiveRocksDB(activeRocksDB);
+    this.compactionDagHelper.setActiveRocksDB(activeRocksDB);
   }
 
   /**
@@ -466,7 +463,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
           }
 
           // Add the compaction log entry to Compaction log table.
-          populateCompactionTable.addToCompactionLogTable(compactionLogEntry,
+          compactionDagHelper.addToCompactionLogTable(compactionLogEntry,
               activeRocksDB, compactionLogTableCFHandle);
 
           // Populate the DAG
@@ -496,31 +493,6 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
     } catch (IOException e) {
       LOG.error("Exception in creating hard link for {}", source);
       throw new RuntimeException("Failed to create hard link", e);
-    }
-  }
-
-  /**
-   * Get number of keys in an SST file.
-   * @param filename SST filename
-   * @return number of keys
-   */
-  private long getSSTFileSummary(String filename)
-      throws RocksDBException, FileNotFoundException {
-
-    if (!filename.endsWith(SST_FILE_EXTENSION)) {
-      filename += SST_FILE_EXTENSION;
-    }
-
-    try (ManagedOptions option = new ManagedOptions();
-         ManagedSstFileReader reader = new ManagedSstFileReader(option)) {
-
-      reader.open(getAbsoluteSstFilePath(filename));
-
-      TableProperties properties = reader.getTableProperties();
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("{} has {} keys", filename, properties.getNumEntries());
-      }
-      return properties.getNumEntries();
     }
   }
 
@@ -593,9 +565,9 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
    */
   public void loadAllCompactionLogs() {
     synchronized (this) {
-      populateCompactionTable
+      compactionDagHelper
           .preconditionChecksForLoadAllCompactionLogs(true);
-      populateCompactionTable.addEntriesFromLogFilesToDagAndCompactionLogTable();
+      compactionDagHelper.addEntriesFromLogFilesToCompactionLogTable();
       try (ManagedRocksIterator managedRocksIterator = new ManagedRocksIterator(
           activeRocksDB.get().newIterator(compactionLogTableCFHandle))) {
         managedRocksIterator.get().seekToFirst();
@@ -894,7 +866,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
                                       String endKey, String columnFamily) {
     long numKeys = 0L;
     try {
-      numKeys = getSSTFileSummary(file);
+      numKeys = CompactionDagHelper.getSSTFileSummary(getAbsoluteSstFilePath(file));
     } catch (RocksDBException e) {
       LOG.warn("Can't get num of keys in SST '{}': {}", file, e.getMessage());
     } catch (FileNotFoundException e) {
@@ -1205,8 +1177,8 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
   }
 
   @VisibleForTesting
-  PopulateCompactionTable getPopulateCompactionTable() {
-    return populateCompactionTable;
+  CompactionDagHelper getPopulateCompactionTable() {
+    return compactionDagHelper;
   }
 
   /**

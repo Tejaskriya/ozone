@@ -26,6 +26,7 @@ import static org.apache.ozone.compaction.log.RocksDBConsts.COMPACTION_LOG_FILE_
 import static org.apache.ozone.compaction.log.RocksDBConsts.COMPACTION_LOG_SEQ_NUM_LINE_PREFIX;
 import static org.apache.ozone.compaction.log.RocksDBConsts.LONG_MAX_STR_LEN;
 import static org.apache.ozone.compaction.log.RocksDBConsts.SPACE_DELIMITER;
+import static org.apache.ozone.compaction.log.RocksDBConsts.SST_FILE_EXTENSION;
 
 import com.google.common.base.Preconditions;
 import java.io.FileNotFoundException;
@@ -49,9 +50,9 @@ import org.slf4j.LoggerFactory;
 /**
  * Utility methods to populate compactionLogTable from a compaction-log file.
  */
-public final class PopulateCompactionTable {
+public final class CompactionDagHelper {
   private static final Logger LOG =
-      LoggerFactory.getLogger(PopulateCompactionTable.class);
+      LoggerFactory.getLogger(CompactionDagHelper.class);
 
   /**
    * Used during DAG construction.
@@ -62,7 +63,7 @@ public final class PopulateCompactionTable {
   private ManagedRocksDB activeRocksDB;
   private ColumnFamilyHandle compactionLogTableCFHandle;
 
-  public PopulateCompactionTable(String compactLogDir, ManagedRocksDB db, ColumnFamilyHandle cf) {
+  public CompactionDagHelper(String compactLogDir, ManagedRocksDB db, ColumnFamilyHandle cf) {
     compactionLogDir = compactLogDir;
     activeRocksDB = db;
     compactionLogTableCFHandle = cf;
@@ -78,7 +79,7 @@ public final class PopulateCompactionTable {
     this.compactionLogTableCFHandle = compactionLogTableCFHandle;
   }
 
-  public void addEntriesFromLogFilesToDagAndCompactionLogTable() {
+  public void addEntriesFromLogFilesToCompactionLogTable() {
     preconditionChecksForLoadAllCompactionLogs(true);
     try {
       try (Stream<Path> pathStream = Files.list(Paths.get(compactionLogDir))
@@ -226,22 +227,27 @@ public final class PopulateCompactionTable {
         "activeRocksDB must be set before calling loadAllCompactionLogs.");
   }
 
-  public long getSSTFileSummary(String filename, String dbPath)
+  /**
+   * Get number of keys in an SST file.
+   * @param filename absolute path of SST file
+   * @return number of keys
+   */
+  public static long getSSTFileSummary(String filename)
       throws RocksDBException, FileNotFoundException {
 
-    if (!filename.endsWith(".sst")) {
-      filename += ".sst";
+    if (!filename.endsWith(SST_FILE_EXTENSION)) {
+      filename += SST_FILE_EXTENSION;
     }
 
     try (ManagedOptions option = new ManagedOptions();
          ManagedSstFileReader reader = new ManagedSstFileReader(option)) {
 
-      reader.open(dbPath + "/" + filename);
+      reader.open(filename);
 
       TableProperties properties = reader.getTableProperties();
-      //if (LOG.isDebugEnabled()) {
-      LOG.info("{} has {} keys", filename, properties.getNumEntries());
-      //}
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("{} has {} keys", filename, properties.getNumEntries());
+      }
       return properties.getNumEntries();
     }
   }
