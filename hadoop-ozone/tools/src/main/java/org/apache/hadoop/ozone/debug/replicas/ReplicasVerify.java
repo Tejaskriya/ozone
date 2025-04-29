@@ -66,6 +66,9 @@ public class ReplicasVerify extends Handler {
     if (verification.doExecuteChecksums) {
       replicaVerifiers.add(new Checksums(client, outputDir));
     }
+    if (verification.doExecuteContainerState) {
+      replicaVerifiers.add(new ReplicaStateVerifier(getConf()));
+    }
 
     findCandidateKeys(client, address);
   }
@@ -124,6 +127,12 @@ public class ReplicasVerify extends Handler {
         // value will be true only if the "--checksums" option was specified on the CLI
         defaultValue = "false")
     private boolean doExecuteChecksums;
+
+    @CommandLine.Option(names = "--container-state",
+        description = "Check the container and replica states",
+        // value will be true only if the "--container-state" option was specified on the CLI
+        defaultValue = "false")
+    private boolean doExecuteContainerState;
 
   }
 }

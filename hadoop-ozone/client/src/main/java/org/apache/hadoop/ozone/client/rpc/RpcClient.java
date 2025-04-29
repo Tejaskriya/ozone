@@ -1848,7 +1848,8 @@ public class RpcClient implements ClientProtocol {
     return keyInfoWithS3Context.getKeyInfo();
   }
 
-  private OmKeyInfo getKeyInfo(
+  @Override
+  public OmKeyInfo getKeyInfo(
       String volumeName, String bucketName, String keyName,
       boolean forceUpdateContainerCache) throws IOException {
     Preconditions.checkNotNull(volumeName);
