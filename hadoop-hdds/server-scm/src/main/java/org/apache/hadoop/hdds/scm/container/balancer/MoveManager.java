@@ -415,7 +415,7 @@ public final class MoveManager implements
         containerInfo.containerID(), datanode);
     replicationManager.sendDeleteCommand(
         //containerInfo, replicaIndex, datanode, true, moveStartTime + moveTimeout);
-    containerInfo, replicaIndex, datanode, true, clock.millis() + moveTimeout - replicationTimeout);
+        containerInfo, replicaIndex, datanode, true, clock.millis() + moveTimeout - replicationTimeout);
   }
 
   private int getContainerReplicaIndex(
