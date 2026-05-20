@@ -102,6 +102,27 @@ public final class S3GatewayConfigKeys {
   public static final String OZONE_S3G_LIST_MAX_KEYS_LIMIT = "ozone.s3g.list.max.keys.limit";
   public static final int OZONE_S3G_LIST_MAX_KEYS_LIMIT_DEFAULT = 1000;
 
+  // STS (Security Token Service) configuration keys
+  public static final String OZONE_S3G_STS_ENABLED_KEY = "ozone.s3g.sts.enabled";
+  public static final boolean OZONE_S3G_STS_ENABLED_DEFAULT = false;
+  
+  public static final String OZONE_S3G_STS_ENDPOINT_KEY = "ozone.s3g.sts.endpoint";
+  
+  public static final String OZONE_S3G_STS_REGION_KEY = "ozone.s3g.sts.region";
+  public static final String OZONE_S3G_STS_REGION_DEFAULT = "us-east-1";
+  
+  public static final String OZONE_S3G_STS_CONNECTION_TIMEOUT_KEY = "ozone.s3g.sts.connection.timeout";
+  public static final int OZONE_S3G_STS_CONNECTION_TIMEOUT_DEFAULT = 5000; // 5 seconds
+  
+  public static final String OZONE_S3G_STS_READ_TIMEOUT_KEY = "ozone.s3g.sts.read.timeout";
+  public static final int OZONE_S3G_STS_READ_TIMEOUT_DEFAULT = 10000; // 10 seconds
+  
+  public static final String OZONE_S3G_STS_CACHE_TTL_KEY = "ozone.s3g.sts.cache.ttl";
+  public static final long OZONE_S3G_STS_CACHE_TTL_DEFAULT = 300000; // 5 minutes
+  
+  public static final String OZONE_S3G_STS_CACHE_SIZE_KEY = "ozone.s3g.sts.cache.size";
+  public static final int OZONE_S3G_STS_CACHE_SIZE_DEFAULT = 1000;
+
   /**
    * Never constructed.
    */
